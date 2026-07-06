@@ -1,0 +1,60 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Packaging and build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Machine learning and model files
+*.pt
+*.pth
+*.pkl
+*.joblib
+*.onnx
+*.bin
+*.h5
+*.ckpt
+
+# Data directories (keep placeholders only)
+ml/data/raw/*
+ml/data/processed/*
+!ml/data/raw/.gitkeep
+!ml/data/processed/.gitkeep
+ml/models/*
+!ml/models/.gitkeep
+
+# Local uploads, temporary files, and logs
+backend/debug_uploads/
+uploads/
+tmp/
+temp/
+*.log
+*.tmp
+*.swp
+
+# Environment variables
+.env
+.env.*
+
+# IDE and OS files
+.vscode/
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Jupyter notebooks
+.ipynb_checkpoints/

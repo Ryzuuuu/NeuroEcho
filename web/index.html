@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NeuroEcho - Brain Health in 90 Seconds</title>
+    <meta name="description" content="AI-powered speech biomarker analysis for early detection of neurological decline.">
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="background-blobs">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
+    <main class="container glass-panel">
+        <header>
+            <div class="logo">
+                <i class="fa-solid fa-brain"></i>
+                <h1>NeuroEcho</h1>
+            </div>
+            <p class="tagline">Brain health in 90 seconds.</p>
+        </header>
+
+        <section id="intro-screen" class="screen active">
+            <div class="icon-container">
+                <i class="fa-solid fa-microphone-lines"></i>
+            </div>
+            <p class="instructions">We will record your voice for 90 seconds to analyze speech biomarkers (jitter, shimmer, and pause patterns).</p>
+            <button id="start-btn" class="primary-btn pulse-anim">
+                <i class="fa-solid fa-microphone"></i> Start 90-Second Test
+            </button>
+            <p class="disclaimer">Screening aid only. Not a diagnosis. Consult a neurologist for medical advice.</p>
+        </section>
+
+        <section id="recording-screen" class="screen">
+            <h2 class="prompt-title">Please read aloud:</h2>
+            <div class="prompt-card glass-panel-inner">
+                <p>"The bright sun rises over the green valley every morning. Children play in the park while birds sing in the trees. It is a beautiful day to go for a long walk and enjoy the fresh air. The quick brown fox jumps over the lazy dog."</p>
+                <p>(Keep reading or speaking naturally until the timer ends)</p>
+            </div>
+            
+            <div class="timer-container">
+                <svg class="progress-ring" width="120" height="120">
+                    <circle class="progress-ring__circle" stroke="white" stroke-width="8" fill="transparent" r="52" cx="60" cy="60"/>
+                </svg>
+                <div id="countdown" class="timer-text">90</div>
+            </div>
+
+            <div class="recording-indicator">
+                <div class="recording-dot"></div>
+                <span>Recording in progress...</span>
+            </div>
+            
+            <button id="stop-btn" class="danger-btn">
+                <i class="fa-solid fa-stop"></i> Stop Early
+            </button>
+        </section>
+
+        <section id="loading-screen" class="screen">
+            <div class="loader">
+                <div class="wave"></div>
+                <div class="wave"></div>
+                <div class="wave"></div>
+                <div class="wave"></div>
+                <div class="wave"></div>
+            </div>
+            <h2>Analyzing Biomarkers...</h2>
+            <p>Our AI is extracting jitter, shimmer, HNR, and timing patterns.</p>
+        </section>
+
+        <section id="result-screen" class="screen">
+            <h2>Your Result</h2>
+            
+            <div class="risk-meter-container">
+                <svg class="risk-ring" width="180" height="180">
+                    <circle class="risk-ring__bg" stroke="rgba(255,255,255,0.1)" stroke-width="14" fill="transparent" r="76" cx="90" cy="90"/>
+                    <circle id="risk-circle" class="risk-ring__fill" stroke="#0FB5AE" stroke-width="14" fill="transparent" r="76" cx="90" cy="90"/>
+                </svg>
+                <div class="risk-score">
+                    <span id="probability-text">0%</span>
+                </div>
+            </div>
+
+            <h3 id="risk-label" class="risk-label">Low Risk</h3>
+            <p id="risk-message" class="risk-message">Message goes here</p>
+
+            <div id="action-container" class="action-container" style="display: none;">
+                <button class="danger-btn full-width">
+                    <i class="fa-solid fa-truck-medical"></i> Find nearest neurologist / Call 108
+                </button>
+            </div>
+
+            <div class="biomarkers-grid">
+                <div class="biomarker-stat glass-panel-inner">
+                    <span class="stat-label">Jitter</span>
+                    <span id="stat-jitter" class="stat-value">--</span>
+                </div>
+                <div class="biomarker-stat glass-panel-inner">
+                    <span class="stat-label">Shimmer</span>
+                    <span id="stat-shimmer" class="stat-value">--</span>
+                </div>
+                <div class="biomarker-stat glass-panel-inner">
+                    <span class="stat-label">HNR</span>
+                    <span id="stat-hnr" class="stat-value">--</span>
+                </div>
+            </div>
+
+            <button id="reset-btn" class="secondary-btn">
+                <i class="fa-solid fa-rotate-left"></i> Back to Home
+            </button>
+            <p class="disclaimer mt-4">Screening aid only — not a diagnosis.</p>
+        </section>
+
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>
