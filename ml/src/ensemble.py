@@ -1,18 +1,17 @@
 """Combine biomarker + CNN predictions into a final risk band."""
-import sys
+import logging
 import math
+import sys
+from functools import lru_cache
 from pathlib import Path
 
 # Add both ml/ (for config) and ml/src/ (for sibling modules) to sys.path
 sys.path.append(str(Path(__file__).parent.parent))
 sys.path.append(str(Path(__file__).parent))
 
-import joblib
-import torch
-import numpy as np
-from train_cnn import NeuroEchoCNN
-from feature_extraction import extract_biomarkers, wav_to_melspec
-from ml_config import MODELS_DIR, GREEN_MAX, YELLOW_MAX
+from ml_config import MODELS_DIR, GREEN_MAX, YELLOW_MAX  # noqa: E402
+
+logger = logging.getLogger(__name__)
 
 # ============================================================================
 # CALIBRATION FOR CONSUMER MICROPHONES
@@ -34,23 +33,22 @@ from ml_config import MODELS_DIR, GREEN_MAX, YELLOW_MAX
 #   Shimmer: 0.10 - 0.25   (ratio)  ~7x higher
 #   HNR:     1 - 10 dB              ~15-20 dB lower
 #
-# We apply a calibration transform to map consumer-mic values into the
-# clinical range before feeding them to the model. This is a linear
-# normalization that maps [consumer_min, consumer_max] → [clinical_min, clinical_max]
-# for each feature.
+# Before the features reach the biomarker model they are shifted towards the
+# clinical range with the empirical correction below: jitter and shimmer are
+# divided by a constant and a constant offset is added to HNR.
 # ============================================================================
-
-# Consumer microphone empirical correction factors
-# Browser WebRTC and cheap ADC mics inflate jitter/shimmer by ~10x
-# and reduce HNR by ~20dB compared to clinical sound booth microphones.
 CONSUMER_CORRECTION = {
     "jitter_div": 10.0,
     "shimmer_div": 10.0,
-    "hnr_add": 20.0
+    "hnr_add": 20.0,
 }
 
 
-def _safe_float(val, default):
+class ModelNotAvailableError(RuntimeError):
+    """Raised when the trained biomarker model cannot be loaded."""
+
+
+def safe_float(val, default):
     """Return val if it's a valid finite float, otherwise default."""
     if val is None:
         return default
@@ -71,68 +69,93 @@ def band_from_prob(p: float) -> str:
     return "RED"
 
 
+MESSAGES = {
+    "GREEN": (
+        "Your speech biomarkers fall within the normal healthy range. "
+        "No significant signs of neurological vocal instability were detected."
+    ),
+    "YELLOW": (
+        "Slight irregularities in vocal patterns detected (e.g., elevated jitter or "
+        "shimmer). We recommend monitoring and taking a follow-up test in a few weeks."
+    ),
+    "RED": (
+        "Significant irregularities in vocal patterns detected that are often "
+        "correlated with neurological decline. We strongly advise consulting a "
+        "neurologist for a professional assessment."
+    ),
+}
+
+
+@lru_cache(maxsize=1)
+def _load_biomarker_model():
+    import joblib
+
+    path = MODELS_DIR / "biomarker_model.pkl"
+    try:
+        return joblib.load(path)
+    except Exception as exc:
+        raise ModelNotAvailableError(
+            f"Could not load biomarker model from {path}: {exc}. "
+            "Train it with `python ml/src/train_biomarker.py`."
+        ) from exc
+
+
+@lru_cache(maxsize=1)
+def _load_cnn():
+    """Return the CNN, or None when it has not been trained (it is optional)."""
+    path = MODELS_DIR / "cnn_model.pt"
+    if not path.exists():
+        return None
+    try:
+        import torch
+        from train_cnn import NeuroEchoCNN
+
+        cnn = NeuroEchoCNN()
+        cnn.load_state_dict(torch.load(path, map_location="cpu"))
+        cnn.eval()
+        return cnn
+    except Exception as exc:
+        logger.warning("Could not load CNN model (%s); using biomarker model only", exc)
+        return None
+
+
 def predict(wav_path: str, w=(0.5, 0.5)) -> dict:
-    """Run ensemble prediction on a WAV file and return risk band + biomarkers."""
+    """Run ensemble prediction on an audio file and return risk band + biomarkers."""
+    from feature_extraction import extract_biomarkers, wav_to_melspec
+
     bm = extract_biomarkers(wav_path)
 
-    # Get raw values with NaN safety
-    jitter_pct = _safe_float(bm["jitter_pct"], 0.5)   # percentage
-    shimmer_pct = _safe_float(bm["shimmer_pct"], 3.0)  # percentage
-    hnr_db = _safe_float(bm["hnr_db"], 15.0)           # dB
+    # Raw values with NaN safety
+    jitter_pct = safe_float(bm["jitter_pct"], 0.5)    # percentage
+    shimmer_pct = safe_float(bm["shimmer_pct"], 3.0)  # percentage
+    hnr_db = safe_float(bm["hnr_db"], 15.0)           # dB
 
-    # Apply empirical corrections to approximate clinical range
+    # Apply empirical corrections to approximate the clinical range
     jitter_cal = (jitter_pct / 100.0) / CONSUMER_CORRECTION["jitter_div"]
     shimmer_cal = (shimmer_pct / 100.0) / CONSUMER_CORRECTION["shimmer_div"]
     hnr_cal = hnr_db + CONSUMER_CORRECTION["hnr_add"]
 
-    fo = _safe_float(bm.get("fo_hz"), 150.0)
-    fhi_raw = _safe_float(bm.get("fhi_hz"), 200.0)
-    flo_raw = _safe_float(bm.get("flo_hz"), 100.0)
-
-    # The UCI dataset consists of sustained vowels ("Aaaaah"), meaning Fhi and Flo
-    # are very close to Fo. If the user speaks naturally, Fhi/Flo sweep wildly,
-    # which confuses the model and causes random probability fluctuations.
-    # We clamp Fhi and Flo to be within +/- 10% of Fo to simulate a sustained vowel.
-    fhi = min(fhi_raw, fo * 1.10)
-    flo = max(flo_raw, fo * 0.90)
-
-    # Order must match the 3 features used in train_biomarker.py:
-    # ["MDVP:Jitter(%)", "MDVP:Shimmer", "HNR"]
+    # Order must match the 3 gender-neutral features used in train_biomarker.py:
+    # ["MDVP:Jitter(%)", "MDVP:Shimmer", "HNR"]. Absolute pitch (Fo/Fhi/Flo) is
+    # deliberately excluded because it is heavily gender-biased.
     calibrated_features = [jitter_cal, shimmer_cal, hnr_cal]
-    print(f"[DEBUG] Calibrated features: fo={fo:.1f}, fhi={fhi:.1f}, flo={flo:.1f}, jitter={jitter_cal:.6f}, shimmer={shimmer_cal:.6f}, hnr={hnr_cal:.3f}")
+    logger.debug(
+        "Calibrated features: jitter=%.6f shimmer=%.6f hnr=%.3f", *calibrated_features
+    )
 
-    # Load biomarker model
-    p_bm = 0.5
-    try:
-        bm_model = joblib.load(MODELS_DIR / "biomarker_model.pkl")
-        p_bm = float(bm_model.predict_proba([calibrated_features])[0, 1])
-        print(f"[DEBUG] Biomarker model probability: {p_bm:.4f}")
-    except Exception as e:
-        print(f"Warning: Could not load biomarker model ({e})")
+    p_bm = float(_load_biomarker_model().predict_proba([calibrated_features])[0, 1])
+    logger.debug("Biomarker model probability: %.4f", p_bm)
 
-    # Load CNN model
-    p_cnn = 0.5
-    try:
-        cnn = NeuroEchoCNN()
-        cnn.load_state_dict(torch.load(MODELS_DIR / "cnn_model.pt", map_location="cpu"))
-        cnn.eval()
+    cnn = _load_cnn()
+    if cnn is None:
+        p_cnn, w = p_bm, (1.0, 0.0)
+    else:
+        import torch
+
         mel = torch.tensor(wav_to_melspec(wav_path)).unsqueeze(0).unsqueeze(0)
         with torch.no_grad():
             p_cnn = torch.sigmoid(cnn(mel)).item()
-    except Exception as e:
-        print(f"Warning: Could not load CNN model ({e}), using biomarker model only")
-        p_cnn = p_bm
-        w = (1.0, 0.0)
 
-    p = float(np.clip(w[0] * p_bm + w[1] * p_cnn, 0, 1))
-
-    # Determine the message to show in the UI based on the band
+    p = min(1.0, max(0.0, w[0] * p_bm + w[1] * p_cnn))
     band = band_from_prob(p)
-    if band == "GREEN":
-        message = "Your speech biomarkers fall within the normal healthy range. No significant signs of neurological vocal instability were detected."
-    elif band == "YELLOW":
-        message = "Slight irregularities in vocal patterns detected (e.g., elevated jitter or shimmer). We recommend monitoring and taking a follow-up test in a few weeks."
-    else:
-        message = "Significant irregularities in vocal patterns detected that are often correlated with neurological decline. We strongly advise consulting a neurologist for a professional assessment."
-
-    return {"probability": round(p, 3), "band": band, "biomarkers": bm, "message": message}
+    return {"probability": round(p, 3), "band": band, "biomarkers": bm, "message": MESSAGES[band]}

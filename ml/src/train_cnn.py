@@ -12,7 +12,7 @@ import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from sklearn.model_selection import train_test_split
 from feature_extraction import wav_to_melspec
-from ml_config import MODELS_DIR, RANDOM_STATE
+from ml_config import MODELS_DIR, RAW_DIR, RANDOM_STATE
 
 
 class VoiceDataset(Dataset):
@@ -42,13 +42,13 @@ class NeuroEchoCNN(nn.Module):
 
 
 def main():
-    pd_files = glob.glob("data/raw/audio/pd/*.wav")
-    healthy_files = glob.glob("data/raw/audio/healthy/*.wav")
+    pd_files = glob.glob(str(RAW_DIR / "audio" / "pd" / "*.wav"))
+    healthy_files = glob.glob(str(RAW_DIR / "audio" / "healthy" / "*.wav"))
     files = pd_files + healthy_files
     labels = [1] * len(pd_files) + [0] * len(healthy_files)
 
     if not files:
-        print("No audio files found. Add WAVs to data/raw/audio/{pd,healthy}/")
+        print(f"No audio files found. Add WAVs to {RAW_DIR / 'audio'}/{{pd,healthy}}/")
         return
 
     f_tr, f_te, l_tr, l_te = train_test_split(
@@ -83,6 +83,7 @@ def main():
             total += len(y)
     print("Test accuracy:", round(correct / total, 3))
 
+    MODELS_DIR.mkdir(parents=True, exist_ok=True)
     torch.save(model.state_dict(), MODELS_DIR / "cnn_model.pt")
     print("Saved model -> models/cnn_model.pt")
 

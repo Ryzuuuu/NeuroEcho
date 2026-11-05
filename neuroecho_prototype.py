@@ -1,8 +1,8 @@
 # neuroecho_prototype.py
-# Standalone demo prototype — run on a laptop with a recorded .wav clip
-# pip install librosa numpy parselmouth praat-parselmouth scipy
+# Standalone rule-based demo — run on a laptop with a recorded .wav clip:
+#   python neuroecho_prototype.py voice.wav
+# Requires: pip install librosa numpy praat-parselmouth scipy
 
-import numpy as np
 import librosa
 import parselmouth
 from parselmouth.praat import call
@@ -11,7 +11,6 @@ from parselmouth.praat import call
 def extract_biomarkers(wav_path):
     """Extract clinically-validated speech biomarkers from a WAV file."""
     snd = parselmouth.Sound(wav_path)
-    pitch = call(snd, "To Pitch", 0.0, 75, 500)
     point_process = call(snd, "To PointProcess (periodic, cc)", 75, 500)
 
     # Voice tremor / instability biomarkers (Parkinson's indicators)
@@ -54,7 +53,11 @@ def risk_score(b):
 
 
 if __name__ == "__main__":
-    path = "sample_voice.wav"
+    import sys
+
+    if len(sys.argv) != 2:
+        sys.exit("Usage: python neuroecho_prototype.py <voice.wav>")
+    path = sys.argv[1]
     b = extract_biomarkers(path)
     print("Speech biomarkers:", b)
     print(risk_score(b))

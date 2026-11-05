@@ -8,7 +8,9 @@ sys.path.append(str(Path(__file__).parent))
 
 import pandas as pd
 import joblib
-import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use("Agg")  # headless backend: the plot is only written to disk
+import matplotlib.pyplot as plt  # noqa: E402
 import shap
 from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score
 from sklearn.preprocessing import StandardScaler
@@ -56,6 +58,8 @@ def main():
     print(classification_report(y_te, pred))
     print("Test ROC-AUC:", round(roc_auc_score(y_te, proba), 3))
     print("Confusion matrix:\n", confusion_matrix(y_te, pred))
+
+    MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
     # Explainability plot
     explainer = shap.TreeExplainer(model.named_steps["clf"])
