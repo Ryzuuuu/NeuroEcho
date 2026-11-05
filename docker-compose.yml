@@ -1,10 +1,11 @@
-version: "3.9"
 services:
   backend:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     ports:
       - "8000:8000"
     volumes:
-      - ./ml/models:/app/models
+      - ./ml/models:/app/ml/models:ro
     environment:
-      - MODEL_DIR=/app/models
+      - MODEL_DIR=/app/ml/models
