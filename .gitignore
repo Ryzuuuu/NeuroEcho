@@ -4,6 +4,9 @@ __pycache__/
 *.pyo
 *.pyd
 .Python
+.pytest_cache/
+.coverage
+htmlcov/
 
 # Virtual environments
 .venv/
@@ -28,13 +31,20 @@ pip-wheel-metadata/
 *.h5
 *.ckpt
 
-# Data directories (keep placeholders only)
+# Data and models (only the small UCI dataset and the lightweight biomarker
+# model are tracked so the project runs straight after cloning)
 ml/data/raw/*
 ml/data/processed/*
 !ml/data/raw/.gitkeep
+!ml/data/raw/parkinsons.data
 !ml/data/processed/.gitkeep
 ml/models/*
 !ml/models/.gitkeep
+!ml/models/biomarker_model.pkl
+!ml/models/shap_summary.png
+
+# Audio recordings (may contain personal voice data)
+*.wav
 
 # Local uploads, temporary files, and logs
 backend/debug_uploads/
@@ -42,6 +52,7 @@ uploads/
 tmp/
 temp/
 *.log
+*_log.txt
 *.tmp
 *.swp
 
