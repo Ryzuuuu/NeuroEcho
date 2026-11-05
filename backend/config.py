@@ -1,6 +1,7 @@
-import os
-from pathlib import Path
+"""Runtime settings for the API."""
 
-MODEL_DIR = Path(os.getenv("MODEL_DIR", Path(__file__).parent.parent / "ml" / "models"))
-ALLOWED_AUDIO = {".wav", ".m4a", ".mp3", ".webm", ".ogg"}
-MAX_AUDIO_SECONDS = 120
+# Formats Praat/Parselmouth can decode. The bundled web client records WAV.
+ALLOWED_AUDIO = {".wav", ".flac", ".mp3"}
+
+# Upload size cap (roughly 2 minutes of 48 kHz stereo 16-bit audio).
+MAX_UPLOAD_BYTES = 25 * 1024 * 1024
