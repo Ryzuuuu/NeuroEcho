@@ -1,4 +1,5 @@
-const API_URL = 'http://127.0.0.1:8000';
+// Same-origin when served by the FastAPI app; fall back to localhost if opened from disk.
+const API_URL = window.location.protocol.startsWith('http') ? '' : 'http://127.0.0.1:8000';
 
 // DOM Elements
 const screens = {
@@ -63,7 +64,6 @@ async function startRecording() {
         
         audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
         actualSampleRate = audioContext.sampleRate; // Get REAL sample rate (browser may ignore our request)
-        console.log('[NeuroEcho] AudioContext actual sample rate:', actualSampleRate, 'Hz');
         input = audioContext.createMediaStreamSource(stream);
         processor = audioContext.createScriptProcessor(4096, 1, 1);
         
@@ -116,8 +116,6 @@ function stopRecording() {
             offset += arr.length;
         }
         
-        console.log('[NeuroEcho] PCM samples collected:', mergedData.length, 'at', actualSampleRate, 'Hz');
-        console.log('[NeuroEcho] Recording duration:', (mergedData.length / actualSampleRate).toFixed(2), 'seconds');
         const wavBlob = encodeWAV(mergedData, actualSampleRate);
         sendToBackend(wavBlob, 'wav');
     }
@@ -183,13 +181,16 @@ async function sendToBackend(audioBlob, ext) {
             body: formData
         });
 
-        if (!response.ok) throw new Error('API Error');
+        if (!response.ok) {
+            const body = await response.json().catch(() => ({}));
+            throw new Error(typeof body.detail === 'string' ? body.detail : 'API Error');
+        }
 
         const result = await response.json();
         displayResults(result);
     } catch (err) {
         console.error(err);
-        alert('Error communicating with the server. Please check if the backend is running.');
+        alert(`Could not complete the analysis: ${err.message}. Please check that the backend is running and try again.`);
         showScreen('intro');
     }
 }
